@@ -1,0 +1,16 @@
+{
+  "name": "bloomway-transit-onepager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-page React site for Bloomway Transit",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "cd frontend && npm install && npm run build",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.2",
+    "express": "^4.19.2"
+  }
+}
