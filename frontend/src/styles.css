@@ -13,6 +13,15 @@
   --radius-lg: 18px;
   --radius-sm: 12px;
   --container: min(1140px, calc(100vw - 3rem));
+  --admin-bg: #f4f7f6;
+  --admin-surface: #ffffff;
+  --admin-surface-muted: #f8f8f8;
+  --admin-border: #e2e8f0;
+  --admin-text: var(--ink-900);
+  --admin-subtext: var(--slate);
+  --admin-sidebar-bg: var(--ink-900);
+  --admin-sidebar-text: #ffffff;
+  --admin-sidebar-active: rgba(255,255,255,0.1);
 }
 
 *,
@@ -1017,4 +1026,124 @@ img {
   .contact-form-container { padding: 20px 16px; }
   
   .contact-form-title { font-size: 1.8rem; }
+}
+
+/* Restored Dark Mode and Motion Overrides missing from user provided css */
+body.dark-mode {
+  background: linear-gradient(180deg, var(--ink-900) 0%, var(--ink-800) 100%);
+  color: #f8fafc;
+  --admin-bg: #0f172a;
+  --admin-surface: #1e293b;
+  --admin-surface-muted: #0b1220;
+  --admin-border: #334155;
+  --admin-text: #f8fafc;
+  --admin-subtext: #cbd5e1;
+  --admin-sidebar-bg: #0b1220;
+  --admin-sidebar-text: #f8fafc;
+  --admin-sidebar-active: rgba(255,255,255,0.08);
+}
+body.dark-mode .nav a,
+body.dark-mode .brand {
+  color: #f8fafc;
+}
+body.dark-mode .topbar-inner {
+  background: rgba(27, 38, 51, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+body.dark-mode .panel,
+body.dark-mode .contact-card,
+body.dark-mode .metric-row li,
+body.dark-mode .contact-form-body {
+  background: rgba(41, 54, 69, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode .body-text,
+body.dark-mode .brand,
+body.dark-mode .contact-info p,
+body.dark-mode .metric-row strong,
+body.dark-mode .section-title,
+body.dark-mode .pv-title,
+body.dark-mode .service-title {
+  color: #f8fafc;
+}
+body.dark-mode .slide {
+  background: transparent !important;
+}
+body.dark-mode #home.slide {
+  background: transparent !important;
+}
+body.dark-mode .menu-btn span {
+  background: #f8fafc;
+}
+body.dark-mode .menu-overlay {
+  background-color: var(--ink-900);
+}
+body.dark-mode .menu-header {
+  color: #f8fafc;
+  background-color: transparent;
+}
+body.dark-mode .site-header .logo-text {
+  color: #f8fafc;
+}
+body.dark-mode .hamburger .line {
+  background: #f8fafc;
+}
+body.dark-mode .pv-block {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+body.reduce-motion .reveal, body.reduce-motion .reveal-on-scroll {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* --- DETAILED DARK MODE CONTRAST OVERRIDES --- */
+body.dark-mode .body-text, 
+body.dark-mode h1, 
+body.dark-mode h2, 
+body.dark-mode h3, 
+body.dark-mode p, 
+body.dark-mode strong, 
+body.dark-mode li {
+  color: #f1f5f9 !important;
+}
+
+body.dark-mode .eyebrow {
+  color: var(--accent) !important;
+}
+
+body.dark-mode .contact-form-container {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .contact-form-title {
+  color: #f8fafc;
+}
+
+body.dark-mode .contact-form-label {
+  color: #cbd5e1;
+}
+
+body.dark-mode .contact-form-input, 
+body.dark-mode .contact-form-textarea {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+body.dark-mode .contact-info p,
+body.dark-mode .contact-info h4 {
+  color: #cbd5e1 !important;
 }

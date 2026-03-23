@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bloomway Transit | Under Construction</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #0f172a;
+        --panel: #111c2e;
+        --accent: #e6b437;
+        --text: #f8fafc;
+        --muted: #cbd5e1;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at top left, rgba(230, 180, 55, 0.18), transparent 50%),
+          radial-gradient(circle at bottom right, rgba(67, 86, 103, 0.3), transparent 55%),
+          var(--bg);
+        font-family: "Sora", "Segoe UI", sans-serif;
+        color: var(--text);
+        padding: 24px;
+      }
+      .card {
+        max-width: 720px;
+        width: 100%;
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        padding: 32px;
+        box-shadow: 0 20px 45px rgba(8, 14, 26, 0.4);
+      }
+      .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--bg);
+        background: var(--accent);
+        font-weight: 700;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 4vw, 2.8rem);
+        line-height: 1.1;
+      }
+      p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 1.05rem;
+        line-height: 1.7;
+      }
+      .contact {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .contact a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .contact a:hover,
+      .contact a:focus-visible {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card" role="main">
+      <span class="badge">Under Construction</span>
+      <h1>Bloomway Transit is launching soon.</h1>
+      <p>
+        We are putting the finishing touches on the new Bloomway Transit website.
+        Thank you for your patience while we get everything ready.
+      </p>
+      <p>If you need immediate assistance, please reach us using the contact details below.</p>
+      <div class="contact">
+        <div>Email: <a href="mailto:info@bloomwaytransit.com">info@bloomwaytransit.com</a></div>
+      </div>
+    </main>
+  </body>
+</html>
