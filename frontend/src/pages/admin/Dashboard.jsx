@@ -23,6 +23,9 @@ const Dashboard = () => {
   const [deletingMediaId, setDeletingMediaId] = useState(null);
   
   const [uploading, setUploading] = useState(false);
+  const [addingExternal, setAddingExternal] = useState(false);
+  const [externalUrl, setExternalUrl] = useState('');
+  const [externalName, setExternalName] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -31,6 +34,7 @@ const Dashboard = () => {
   const [passwordError, setPasswordError] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+  const uploadsEnabled = String(import.meta.env?.VITE_UPLOADS_ENABLED || 'true').toLowerCase() === 'true';
 
   const navigate = useNavigate();
 
@@ -234,6 +238,35 @@ const Dashboard = () => {
       setMediaError('Failed to delete media.');
     } finally {
       setDeletingMediaId(null);
+    }
+  };
+
+  const handleAddExternalMedia = async (e) => {
+    e.preventDefault();
+    if (!externalUrl) return;
+    setAddingExternal(true);
+    setMediaNotice('');
+    setMediaError('');
+    try {
+      const res = await csrfFetch('/api/admin/media/external', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ file_url: externalUrl, file_name: externalName })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setExternalUrl('');
+        setExternalName('');
+        setMediaNotice(data.message || 'External media added.');
+        fetchMedia();
+      } else {
+        setMediaError(data.error || 'Failed to add external media.');
+      }
+    } catch (err) {
+      setMediaError('Failed to add external media.');
+    } finally {
+      setAddingExternal(false);
     }
   };
 
@@ -453,15 +486,41 @@ const Dashboard = () => {
                 <p className="body-text" style={{ color: 'var(--admin-subtext)', margin: '5px 0 0 0' }}>Upload and manage website images.</p>
               </div>
               <div>
-                <label className="btn" style={{ cursor: 'pointer', background: 'var(--ink-900)', color: 'white' }}>
-                  {uploading ? 'Uploading...' : 'Upload Image'}
-                  <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept="image/*" disabled={uploading} />
-                </label>
+                {uploadsEnabled ? (
+                  <label className="btn" style={{ cursor: 'pointer', background: 'var(--ink-900)', color: 'white' }}>
+                    {uploading ? 'Uploading...' : 'Upload Image'}
+                    <input type="file" style={{ display: 'none' }} onChange={handleFileUpload} accept="image/*" disabled={uploading} />
+                  </label>
+                ) : (
+                  <div style={{ color: 'var(--admin-subtext)', fontSize: '0.9rem' }}>Uploads disabled</div>
+                )}
               </div>
             </div>
 
             {mediaNotice && <div style={{ padding: '12px 15px', background: '#d1fae5', color: '#065f46', borderRadius: '6px', marginBottom: '15px' }}>{mediaNotice}</div>}
             {mediaError && <div style={{ padding: '12px 15px', background: '#fee2e2', color: '#991b1b', borderRadius: '6px', marginBottom: '15px' }}>{mediaError}</div>}
+
+            <form onSubmit={handleAddExternalMedia} style={{ marginBottom: '20px', background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: '16px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'grid', gap: '10px' }}>
+              <div style={{ fontWeight: 600, color: 'var(--admin-text)' }}>Add Image by URL (IONOS WebExplorer)</div>
+              <input
+                type="url"
+                placeholder="https://yourdomain.com/uploads/image.webp"
+                value={externalUrl}
+                onChange={e => setExternalUrl(e.target.value)}
+                required
+                style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--admin-border)', background: 'var(--admin-surface-muted)', color: 'var(--admin-text)' }}
+              />
+              <input
+                type="text"
+                placeholder="Optional display name"
+                value={externalName}
+                onChange={e => setExternalName(e.target.value)}
+                style={{ padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--admin-border)', background: 'var(--admin-surface-muted)', color: 'var(--admin-text)' }}
+              />
+              <button type="submit" className="btn" style={{ width: 'fit-content' }} disabled={addingExternal}>
+                {addingExternal ? 'Adding...' : 'Add External Image'}
+              </button>
+            </form>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
               {media.map(asset => (

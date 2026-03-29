@@ -2,13 +2,12 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const db = require('../db');
-const { apiLimiter, csrfProtection, contactLimiter } = require('../middleware/security');
+const { csrfProtection, contactLimiter } = require('../middleware/security');
 const { sanitizePlainText } = require('../utils/sanitize');
 const { normalizeEmail, isValidEmail } = require('../utils/auth');
 
-// Apply CSRF protection and API rate limiting
+// Apply CSRF protection to all state-changing routes.
 router.use(csrfProtection);
-router.use(apiLimiter);
 
 // Get all public pages with nested CMS blocks
 router.get('/pages', async (req, res) => {

@@ -1,11 +1,24 @@
 let cachedToken = null;
 let inflight = null;
 
+const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE_URL) || '';
+const CSRF_PATH = '/api/admin/csrf-token';
+
+function resolveUrl(url) {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!API_BASE) return url;
+  const base = API_BASE.replace(/\/+$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${path}`;
+}
+
 async function fetchCsrfToken() {
   if (cachedToken) return cachedToken;
   if (inflight) return inflight;
 
-  inflight = fetch('/api/admin/csrf-token', {
+  const csrfUrl = resolveUrl(CSRF_PATH);
+  inflight = fetch(csrfUrl, {
     method: 'GET',
     credentials: 'include',
   })
@@ -30,9 +43,11 @@ export async function csrfFetch(url, options = {}) {
 
   opts.credentials = opts.credentials || 'include';
   const method = (opts.method || 'GET').toUpperCase();
+  const resolvedUrl = resolveUrl(url);
+  const csrfUrl = resolveUrl(CSRF_PATH);
 
   // Always try to include a CSRF token when available
-  if (url !== '/api/admin/csrf-token') {
+  if (resolvedUrl !== csrfUrl) {
     try {
       const token = await fetchCsrfToken();
       if (token) headers['X-CSRF-Token'] = token;
@@ -43,7 +58,7 @@ export async function csrfFetch(url, options = {}) {
 
   opts.headers = headers;
 
-  let res = await fetch(url, opts);
+  let res = await fetch(resolvedUrl, opts);
 
   // If token is stale, retry once for non-GET requests
   if (res.status === 403 && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
@@ -52,7 +67,7 @@ export async function csrfFetch(url, options = {}) {
       const token = await fetchCsrfToken();
       if (token) {
         opts.headers = { ...(opts.headers || {}), 'X-CSRF-Token': token };
-        res = await fetch(url, opts);
+        res = await fetch(resolvedUrl, opts);
       }
     } catch (e) {
       // fall through

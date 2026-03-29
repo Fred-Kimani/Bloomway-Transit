@@ -12,7 +12,13 @@ const {
   normalizeEmail,
   isValidEmail,
 } = require('../utils/auth');
-const { loginLimiter, registerLimiter, csrfProtection, apiLimiter } = require('../middleware/security');
+const {
+  loginLimiter,
+  csrfProtection,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+  mediaLimiter,
+} = require('../middleware/security');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
@@ -32,6 +38,7 @@ const authCookieOptions = {
   secure: isProd,
   sameSite: 'strict',
   maxAge: 15 * 60 * 1000,
+  path: '/',
 };
 
 const MASTER_ADMIN_EMAIL = 'info@bloomwaytransit.com';
@@ -78,50 +85,65 @@ async function logAudit({ userId, action, tableName, recordId, oldData, newData 
 }
 
 // ====== Uploads ======
+const uploadsEnabled = String(process.env.UPLOADS_ENABLED || 'true').toLowerCase() === 'true';
 const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const EXT_BY_MIME = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/webp': '.webp',
 };
+const MIME_BY_EXT = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+};
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = EXT_BY_MIME[file.mimetype] || '';
-    const filename = crypto.randomUUID() + ext;
-    cb(null, filename);
+let upload = null;
+if (uploadsEnabled) {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
   }
-});
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: function (req, file, cb) {
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      const err = new Error('INVALID_FILE_TYPE');
-      return cb(err);
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+      const ext = EXT_BY_MIME[file.mimetype] || '';
+      const filename = crypto.randomUUID() + ext;
+      cb(null, filename);
     }
-    cb(null, true);
-  }
-});
+  });
+
+  upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: function (req, file, cb) {
+      if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+        const err = new Error('INVALID_FILE_TYPE');
+        return cb(err);
+      }
+      cb(null, true);
+    }
+  });
+}
 
 // ====== Email Transport (SMTP) ======
-const SMTP_SERVICE = process.env.SMTP_SERVICE || 'gmail';
+// IONOS defaults are used when values are not provided explicitly.
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.ionos.com';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
 const SMTP_USER = requireEnv('SMTP_USER');
 const SMTP_PASS = requireEnv('SMTP_PASS');
 const FROM_EMAIL = process.env.SMTP_FROM || SMTP_USER;
 
 const transporter = SMTP_USER && SMTP_PASS
   ? nodemailer.createTransport({
-      service: SMTP_SERVICE,
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
@@ -130,20 +152,61 @@ const transporter = SMTP_USER && SMTP_PASS
   : null;
 
 function logFailedLoginAttempt({ email, ip, userAgent, reason }) {
-  // Placeholder for centralized logging/monitoring (e.g., SIEM, Datadog)
-  console.warn('Failed login attempt', { email, ip, userAgent, reason });
+  // Placeholder for centralized logging/monitoring (e.g., SIEM/CloudWatch/Datadog).
+  console.warn('Failed login attempt', {
+    timestamp: new Date().toISOString(),
+    email,
+    ip,
+    userAgent,
+    reason,
+  });
 }
 
 // Apply CSRF protection to all state-changing routes
 router.use(csrfProtection);
 
 // Register
-router.post('/register', registerLimiter, async (req, res) => {
-  return res.status(403).json({ error: 'Admin registration is disabled.' });
-});
+router.post('/register', async (req, res) => {
+  try {
+    const email = normalizeEmail(sanitizePlainText(req.body.email || ''));
+    const password = req.body.password;
 
-// Apply rate limiting for all other admin endpoints
-router.use(apiLimiter);
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.ok) {
+      return res.status(400).json({ error: passwordCheck.message });
+    }
+
+    const [existing] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const newId = crypto.randomUUID();
+    const hash = await hashPassword(password);
+    await db.query('INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)', [newId, email, hash]);
+
+    await logAudit({
+      userId: newId,
+      action: 'admin_register',
+      tableName: 'users',
+      recordId: newId,
+      oldData: null,
+      newData: { id: newId, email }
+    });
+
+    res.status(201).json({ message: 'Admin account registered successfully!' });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Server error during registration' });
+  }
+});
 
 // CSRF Token Route
 router.get('/csrf-token', (req, res) => {
@@ -185,7 +248,14 @@ router.post('/login', loginLimiter, async (req, res) => {
     const token = generateToken({ id: user.id, email: user.email });
     
     res.cookie('token', token, authCookieOptions);
-    res.json({ message: 'Login successful' });
+    res.json({
+      message: 'Login successful',
+      twoFactor: {
+        required: false,
+        placeholder: true,
+        message: '2FA placeholder: integrate TOTP/SMS/email verification for admin accounts.',
+      },
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });
@@ -194,7 +264,12 @@ router.post('/login', loginLimiter, async (req, res) => {
 
 // Logout
 router.post('/logout', (req, res) => {
-  res.clearCookie('token', authCookieOptions);
+  res.clearCookie('token', {
+    httpOnly: authCookieOptions.httpOnly,
+    secure: authCookieOptions.secure,
+    sameSite: authCookieOptions.sameSite,
+    path: authCookieOptions.path,
+  });
   res.json({ message: 'Logged out successfully' });
 });
 
@@ -226,6 +301,15 @@ const verifyToken = async (req, res, next) => {
 
 router.get('/verify', verifyToken, (req, res) => {
   res.status(200).json({ valid: true, email: req.userEmail || null });
+});
+
+// 2FA placeholder endpoint (not a full implementation)
+router.post('/2fa/verify', verifyToken, async (req, res) => {
+  return res.status(501).json({
+    error: '2FA verification is not implemented yet.',
+    placeholder: true,
+    nextStep: 'Implement TOTP challenge verification for admin accounts.',
+  });
 });
 
 // Change Password (authenticated)
@@ -382,6 +466,10 @@ router.delete('/admins/:id', verifyToken, async (req, res) => {
 // Invite a new admin (only specific inviter email)
 router.post('/admins/invite', verifyToken, async (req, res) => {
   try {
+    if (!transporter) {
+      return res.status(500).json({ error: 'Email service is not configured.' });
+    }
+
     const inviterEmail = String(req.userEmail || '').toLowerCase();
     if (inviterEmail !== String(INVITE_ADMIN_EMAIL).toLowerCase()) {
       return res.status(403).json({ error: 'You are not allowed to invite admins.' });
@@ -446,7 +534,7 @@ router.post('/admins/invite', verifyToken, async (req, res) => {
 // ====== PASSWORD RESET FLOW ======
 
 // Forgot Password
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const email = normalizeEmail(sanitizePlainText(req.body.email || ''));
     if (!email) {
@@ -493,7 +581,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset Password
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', resetPasswordLimiter, async (req, res) => {
   try {
     const token = req.body.token;
     const newPassword = req.body.newPassword;
@@ -622,6 +710,9 @@ router.delete('/messages/:id', verifyToken, async (req, res) => {
 
 // ====== CMS ROUTES ======
 
+// Rate limit all /media operations explicitly (in addition to global /api limiter)
+router.use('/media', mediaLimiter);
+
 // Get all pages with sections and blocks
 router.get('/pages', verifyToken, async (req, res) => {
   try {
@@ -720,7 +811,7 @@ router.delete('/media/:id', verifyToken, async (req, res) => {
     });
 
     // Remove file from disk (best effort)
-    if (storedName) {
+    if (storedName && uploadsEnabled) {
       fs.unlink(fileOnDisk, (err) => {
         if (err) {
           console.warn('Failed to remove media file:', err.message);
@@ -735,18 +826,82 @@ router.delete('/media/:id', verifyToken, async (req, res) => {
   }
 });
 
+// Add external media asset by URL (for static hosting workflows)
+router.post('/media/external', verifyToken, async (req, res) => {
+  try {
+    const fileUrlRaw = sanitizePlainText(req.body.file_url || '');
+    const fileNameRaw = sanitizePlainText(req.body.file_name || '');
+
+    if (!fileUrlRaw) {
+      return res.status(400).json({ error: 'file_url is required' });
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(fileUrlRaw);
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'Only http and https URLs are allowed' });
+    }
+
+    const ext = path.extname(parsed.pathname || '').toLowerCase();
+    const mimeType = MIME_BY_EXT[ext];
+    if (!mimeType) {
+      return res.status(400).json({ error: 'Invalid file type. Only JPEG, PNG, and WEBP are allowed.' });
+    }
+
+    const safeName = (fileNameRaw || path.basename(parsed.pathname || '') || 'external-image').slice(0, 255);
+    const newId = crypto.randomUUID();
+
+    await db.query(
+      'INSERT INTO media_assets (id, file_name, file_path, mime_type, size_bytes) VALUES (?, ?, ?, ?, ?)',
+      [newId, safeName, parsed.toString(), mimeType, 0]
+    );
+
+    await logAudit({
+      userId: req.userId,
+      action: 'media_external_add',
+      tableName: 'media_assets',
+      recordId: newId,
+      oldData: null,
+      newData: {
+        id: newId,
+        file_name: safeName,
+        file_path: parsed.toString(),
+        mime_type: mimeType,
+        size_bytes: 0
+      }
+    });
+
+    res.status(201).json({ message: 'External media added successfully', asset_id: newId, file_path: parsed.toString() });
+  } catch (error) {
+    console.error('Add external media error:', error);
+    res.status(500).json({ error: 'Failed to add external media' });
+  }
+});
+
 // Upload new media asset
-router.post('/media', verifyToken, upload.single('image'), async (req, res) => {
+const uploadImageMiddleware = (req, res, next) => {
+  if (!uploadsEnabled || !upload) {
+    return res.status(503).json({ error: 'Uploads are disabled in this environment.' });
+  }
+  return upload.single('image')(req, res, next);
+};
+
+router.post('/media', verifyToken, uploadImageMiddleware, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
 
     const newId = crypto.randomUUID();
     const filePath = `/uploads/${req.file.filename}`;
-    const safeOriginalName = sanitizePlainText(req.file.originalname || '').slice(0, 255);
+    const storedName = req.file.filename;
 
     await db.query(
       'INSERT INTO media_assets (id, file_name, file_path, mime_type, size_bytes) VALUES (?, ?, ?, ?, ?)',
-      [newId, safeOriginalName, filePath, req.file.mimetype, req.file.size]
+      [newId, storedName, filePath, req.file.mimetype, req.file.size]
     );
 
     await logAudit({
@@ -757,7 +912,7 @@ router.post('/media', verifyToken, upload.single('image'), async (req, res) => {
       oldData: null,
       newData: {
         id: newId,
-        file_name: safeOriginalName,
+        file_name: storedName,
         file_path: filePath,
         mime_type: req.file.mimetype,
         size_bytes: req.file.size

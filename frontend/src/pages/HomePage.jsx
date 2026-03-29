@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { csrfFetch } from '../utils/csrf';
 
 // --- CUSTOM TOGGLES ---
@@ -56,10 +57,14 @@ const EditableText = ({ Component, className = '', block, fallback, isEditing, o
   const safeContent = contentValue || '';
   const hasHtml = /<\/?[a-z][\s\S]*>/i.test(safeContent);
   const mergedStyle = { ...(props.style || {}), whiteSpace: 'pre-wrap' };
+  const safeHtml = DOMPurify.sanitize(safeContent, {
+    USE_PROFILES: { html: true },
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'title'],
+  }).replace(/\n/g, '<br/>');
 
   if (!isEditing) {
     if (hasHtml) {
-      return <Component className={className} {...props} dangerouslySetInnerHTML={{ __html: safeContent.replace(/\n/g, '<br/>') }}></Component>;
+      return <Component className={className} {...props} dangerouslySetInnerHTML={{ __html: safeHtml }}></Component>;
     }
     return <Component className={className} {...props} style={mergedStyle}>{safeContent}</Component>;
   }
@@ -67,7 +72,7 @@ const EditableText = ({ Component, className = '', block, fallback, isEditing, o
   return (
     <div className={className} style={{ position: 'relative', display: 'block', paddingRight: '40px', marginBottom: '8px' }} {...props}>
       {hasHtml ? (
-        <Component style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: safeContent.replace(/\n/g, '<br/>') }} />
+        <Component style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: safeHtml }} />
       ) : (
         <Component style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{safeContent}</Component>
       )}
