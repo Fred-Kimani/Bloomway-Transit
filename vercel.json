@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "buildCommand": "echo 'No build step required for backend'",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ]
+}

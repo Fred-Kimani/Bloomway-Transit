@@ -1,0 +1,13 @@
+# Ignore frontend build entirely for vercel backend
+frontend/
+
+# Ignore uploads since Vercel has ephemeral storage
+uploads/
+
+# Ignore standard unneeded dev files
+.git
+.vscode
+node_modules
+README.md
+.env.example
+*.log
