@@ -66,7 +66,7 @@ const corsOrigin = process.env.CORS_ORIGIN
     .split(',')
     .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean)
-  : ['http://localhost:3000', 'http://localhost:5173', 'https://www.bloomwaytransit.com'];
+  : ['http://localhost:3000', 'http://localhost:5173', 'https://www.bloomwaytransit.com', 'http://www.bloomwaytransit.com', 'http://bloomwaytransit.com'];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -99,7 +99,12 @@ if (serveFrontend) {
   app.use((req, res, next) => {
     if (!isMaintenanceMode) return next();
     const pathLower = req.path.toLowerCase();
-    if (pathLower.startsWith('/api') || pathLower.startsWith('/admin') || pathLower.startsWith('/uploads')) {
+    if (
+      pathLower.startsWith('/api') ||
+      pathLower.startsWith('/admin') ||
+      pathLower.startsWith('/uploads') ||
+      pathLower.match(/\.(png|jpe?g|gif|svg|webp|ico)$/i)
+    ) {
       return next();
     }
     res.setHeader('Retry-After', '3600');
